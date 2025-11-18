@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Save, FileText, Trash2 } from 'lucide-react';
+import { Settings, Save, FileText, Trash2, Download, Upload } from 'lucide-react';
 
 const FONTS = [
   { name: 'Indie Flower', value: "'Indie Flower', cursive" },
@@ -19,7 +19,10 @@ const PAPER_PATTERNS = [
 ];
 
 export default function JournalApp() {
-  const [entries, setEntries] = useState([]);
+  const [entries, setEntries] = useState(() => {
+    const saved = localStorage.getItem('journalEntries');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [currentEntry, setCurrentEntry] = useState('');
   const [currentTitle, setCurrentTitle] = useState('');
   const [showSettings, setShowSettings] = useState(false);
@@ -37,6 +40,11 @@ export default function JournalApp() {
   });
 
   const canvasRef = useRef(null);
+
+  // Save entries to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('journalEntries', JSON.stringify(entries));
+  }, [entries]);
 
   useEffect(() => {
     const link = document.createElement('link');
@@ -158,6 +166,35 @@ export default function JournalApp() {
     setCurrentTitle('');
   };
 
+  const exportEntries = () => {
+    const dataStr = JSON.stringify(entries, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `journal-backup-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importEntries = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const imported = JSON.parse(event.target.result);
+        if (Array.isArray(imported)) {
+          setEntries(imported);
+        }
+      } catch (err) {
+        alert('Error importing file. Please make sure it\'s a valid journal backup.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="flex h-screen bg-gray-900 text-gray-100">
       <link href="https://fonts.googleapis.com/css2?family=Indie+Flower&family=Caveat:wght@400;700&family=Permanent+Marker&family=Shadows+Into+Light&family=Kalam:wght@300;400;700&family=Patrick+Hand&display=swap" rel="stylesheet" />
@@ -168,11 +205,32 @@ export default function JournalApp() {
           <h1 className="text-2xl font-bold mb-4">My Journal</h1>
           <button
             onClick={newEntry}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg flex items-center justify-center gap-2 mb-2"
           >
             <FileText size={18} />
             New Entry
           </button>
+          <div className="flex gap-2">
+            <button
+              onClick={exportEntries}
+              className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm"
+              title="Export all entries"
+            >
+              <Download size={16} />
+              Export
+            </button>
+            <label className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm cursor-pointer"
+              title="Import entries">
+              <Upload size={16} />
+              Import
+              <input
+                type="file"
+                accept=".json"
+                onChange={importEntries}
+                className="hidden"
+              />
+            </label>
+          </div>
         </div>
         
         <div className="flex-1 overflow-y-auto p-4">
